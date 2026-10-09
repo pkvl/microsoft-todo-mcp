@@ -7,3 +7,7 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
+token-cache*.enc
+token-cache*.json
+operations/
+.test-state/

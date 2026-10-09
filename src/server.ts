@@ -8,21 +8,19 @@ import { toAppError } from "./graph/errors";
 import { systemClock } from "./lib/clock";
 import { cryptoIds } from "./lib/ids";
 import { createLogger } from "./lib/logger";
-import { IdempotencyCache } from "./lib/idempotency";
+import { CreateOperations } from "./lib/create-operations";
 import { TaskListsApi } from "./todo/lists";
 import { TasksApi } from "./todo/tasks";
 import { allTools } from "./tools/registry";
 import { errorResult, okResult, type ToolContext } from "./tools/_shared";
 import { VERSION } from "./version";
 
-const IDEMPOTENCY_TTL_MS = 60_000;
-
 export async function runServer(config: AppConfig = loadConfig()): Promise<void> {
   const logger = createLogger(config.logLevel);
 
   // A missing client id is a config problem, not a crash: start the server anyway and let
   // `auth_status` and any Graph-touching tool report `config_error` clearly.
-  const pca = config.clientId ? createPca(config, logger) : null;
+  const pca = config.clientId ? await createPca(config, logger) : null;
   const configError = pca ? undefined : "No Microsoft Entra client ID configured. Set MS_TODO_CLIENT_ID (see docs/ENTRA-APP-SETUP.md).";
   const auth = new AuthManager(pca, scopesFor(config), logger, () => systemClock.now(), configError);
   await auth.init();
@@ -34,7 +32,7 @@ export async function runServer(config: AppConfig = loadConfig()): Promise<void>
     auth,
     lists: new TaskListsApi(graph, config.maxResults),
     tasks: new TasksApi(graph, config.maxResults),
-    idempotency: new IdempotencyCache(systemClock, IDEMPOTENCY_TTL_MS),
+    operations: new CreateOperations(config.operationsPath),
   };
 
   const server = new McpServer({ name: "microsoft-todo-mcp", version: VERSION });
@@ -46,7 +44,14 @@ export async function runServer(config: AppConfig = loadConfig()): Promise<void>
     if (config.noDestructive && tool.risk === "destructive") { skipped++; continue; }
     registered++;
 
-    server.tool(tool.name, tool.description, tool.inputShape, async (args: Record<string, unknown>) => {
+    server.registerTool(tool.name, {
+      description: tool.description,
+      inputSchema: tool.inputShape,
+      annotations: {
+        readOnlyHint: tool.risk === "read",
+        destructiveHint: tool.risk === "destructive",
+      },
+    }, async (args: Record<string, unknown>) => {
       const startedAt = Date.now();
       const log = logger.child({ tool: tool.name });
       try {

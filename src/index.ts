@@ -46,7 +46,7 @@ Flags (serve):
   --scope-readonly   Request only the Tasks.Read scope (requires re-login)
 
 Env:
-  MS_TODO_CLIENT_ID, MS_TODO_AUTHORITY, MS_TODO_TOKEN_CACHE,
+  MS_TODO_CLIENT_ID, MS_TODO_AUTHORITY, MS_TODO_TOKEN_CACHE, MS_TODO_OPERATIONS_DIR,
   MS_TODO_MAX_RESULTS, MS_TODO_GRAPH_BASE, LOG_LEVEL
 
 First-time setup: docs/ENTRA-APP-SETUP.md
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
       return;
 
     case "login": {
-      const result = await acquireByDeviceCode(createPca(config, logger), scopesFor(config), (info) => {
+      const result = await acquireByDeviceCode(await createPca(config, logger), scopesFor(config), (info) => {
         process.stdout.write(`\n${info.message}\n\n`);
       });
       process.stdout.write(`Signed in as ${result.account?.username ?? "an unknown account"}.\n`);
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
       return;
 
     case "whoami": {
-      const account = await getCachedAccount(createPca(config, logger));
+      const account = await getCachedAccount(await createPca(config, logger));
       if (!account) {
         process.stdout.write("Not signed in. Run `microsoft-todo-mcp login`.\n");
         return;

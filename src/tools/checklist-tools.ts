@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool, withIdempotency } from "./_shared";
+import { defineTool, OperationId, withIdempotency } from "./_shared";
 
 export const checklistTools = [
   defineTool({
@@ -14,7 +14,7 @@ export const checklistTools = [
     name: "add_checklist_item",
     description: "Add a checklist item to a task.",
     risk: "write",
-    input: { listId: z.string(), taskId: z.string(), displayName: z.string().min(1), isChecked: z.boolean().optional() },
+    input: { listId: z.string(), taskId: z.string(), displayName: z.string().min(1), isChecked: z.boolean().optional(), operationId: OperationId },
     handler: (args, ctx) =>
       withIdempotency(ctx, "add_checklist_item", args, () =>
         ctx.tasks.addChecklistItem(args.listId, args.taskId, args.displayName, args.isChecked ?? false, ctx.ids.uuid()),

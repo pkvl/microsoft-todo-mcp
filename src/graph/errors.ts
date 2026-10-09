@@ -10,6 +10,7 @@ export type ErrorCode =
   | "rate_limited"
   | "graph_unavailable"
   | "graph_error"
+  | "operation_uncertain"
   | "internal_error";
 
 export interface AppErrorJSON {

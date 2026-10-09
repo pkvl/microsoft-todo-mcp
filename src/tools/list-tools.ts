@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool, withIdempotency } from "./_shared";
+import { defineTool, OperationId, withIdempotency } from "./_shared";
 
 export const listTools = [
   defineTool({
@@ -17,7 +17,7 @@ export const listTools = [
     name: "create_task_list",
     description: "Create a new To Do task list.",
     risk: "write",
-    input: { displayName: z.string().min(1).describe("Name of the new list") },
+    input: { displayName: z.string().min(1).describe("Name of the new list"), operationId: OperationId },
     handler: (args, ctx) => withIdempotency(ctx, "create_task_list", args, () => ctx.lists.create(args.displayName, ctx.ids.uuid())),
   }),
 

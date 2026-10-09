@@ -1,6 +1,6 @@
 import { LogLevel, PublicClientApplication } from "@azure/msal-node";
 import type { AccountInfo, AuthenticationResult } from "@azure/msal-node";
-import { fileCachePlugin } from "./token-cache";
+import { encryptedCachePlugin } from "./token-cache";
 import { AppError } from "../graph/errors";
 import type { AppConfig } from "../config";
 import type { Logger } from "../lib/logger";
@@ -14,7 +14,7 @@ export interface DeviceCodeInfo {
   expiresIn: number;
 }
 
-export function createPca(config: AppConfig, logger: Logger): PublicClientApplication {
+export async function createPca(config: AppConfig, logger: Logger): Promise<PublicClientApplication> {
   if (!config.clientId) {
     throw new AppError(
       "config_error",
@@ -23,7 +23,7 @@ export function createPca(config: AppConfig, logger: Logger): PublicClientApplic
   }
   return new PublicClientApplication({
     auth: { clientId: config.clientId, authority: config.authority },
-    cache: { cachePlugin: fileCachePlugin(config.tokenCachePath) },
+    cache: { cachePlugin: await encryptedCachePlugin(config.tokenCachePath) },
     system: {
       loggerOptions: {
         piiLoggingEnabled: false,

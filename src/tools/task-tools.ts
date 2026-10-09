@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DateTimeInput, Importance, TaskStatus } from "../lib/schema";
-import { defineTool, withIdempotency } from "./_shared";
+import { defineTool, OperationId, withIdempotency } from "./_shared";
 
 export const taskTools = [
   defineTool({
@@ -51,6 +51,7 @@ export const taskTools = [
     input: {
       listId: z.string(),
       title: z.string().min(1),
+      operationId: OperationId,
       body: z.string().optional().describe("Plain-text note/body"),
       dueDateTime: DateTimeInput.optional().describe("Due date-time: ISO-8601 string (host timezone) or { dateTime, timeZone }"),
       reminderDateTime: DateTimeInput.optional(),

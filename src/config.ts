@@ -18,6 +18,7 @@ export interface AppConfig {
   clientId: string;
   authority: string;
   tokenCachePath: string;
+  operationsPath: string;
   /** Request only `Tasks.Read` (true read-only capability; requires re-login). */
   scopeReadonly: boolean;
   /** Runtime guard: hide write + destructive tools. */
@@ -34,7 +35,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     clientId: env.MS_TODO_CLIENT_ID ?? PUBLISHED_CLIENT_ID,
     authority: env.MS_TODO_AUTHORITY ?? "https://login.microsoftonline.com/common",
-    tokenCachePath: env.MS_TODO_TOKEN_CACHE ?? join(homedir(), ".config", "microsoft-todo-mcp", "token-cache.json"),
+    tokenCachePath: env.MS_TODO_TOKEN_CACHE ?? join(homedir(), ".config", "microsoft-todo-mcp", envBool(env.MS_TODO_SCOPE_READONLY) ? "token-cache-read.enc" : "token-cache.enc"),
+    operationsPath: env.MS_TODO_OPERATIONS_DIR ?? join(homedir(), ".config", "microsoft-todo-mcp", "operations"),
     scopeReadonly: envBool(env.MS_TODO_SCOPE_READONLY),
     readonly: envBool(env.MS_TODO_READONLY),
     noDestructive: envBool(env.MS_TODO_NO_DESTRUCTIVE),

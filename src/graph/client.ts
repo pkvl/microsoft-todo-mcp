@@ -2,6 +2,7 @@ import { AppError, mapGraphError } from "./errors";
 import type { AppConfig } from "../config";
 import type { IdGenerator } from "../lib/ids";
 import type { Logger } from "../lib/logger";
+import { graphDestination } from "./destination";
 
 /** Supplies an access token to the Graph client; throws an `auth_*` AppError when it can't. */
 export interface TokenProvider {
@@ -51,7 +52,7 @@ export class GraphClient {
     const log = this.deps.logger.child({ traceId: opts.traceId, op: `${method} ${safePath(url)}` });
     // A POST may have reached Graph even if we never saw the response — never auto-retry one
     // on a transport-level failure (timeout / connection error / body read error). The caller
-    // can retry the tool call; the per-tool idempotency cache absorbs the duplicate.
+    // must inspect the task list before issuing a new create after an uncertain outcome.
     const retrySafeOnTransportFailure = method.toUpperCase() !== "POST";
 
     for (let attempt = 0; ; attempt++) {
@@ -72,6 +73,7 @@ export class GraphClient {
           },
           body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
           signal: AbortSignal.timeout(this.requestTimeoutMs),
+          redirect: "error",
         });
         bodyText = await res.text();
       } catch (err) {
@@ -83,10 +85,10 @@ export class GraphClient {
           continue;
         }
         throw new AppError(
-          "graph_unavailable",
+          retrySafeOnTransportFailure ? "graph_unavailable" : "operation_uncertain",
           timedOut
-            ? `Microsoft Graph did not respond within ${Math.round(this.requestTimeoutMs / 1000)}s.`
-            : `Network error talking to Microsoft Graph: ${(err as Error).message}`,
+            ? `Microsoft Graph did not respond within ${Math.round(this.requestTimeoutMs / 1000)}s.${retrySafeOnTransportFailure ? "" : " The create may have succeeded; inspect the list before creating again."}`
+            : `Network error talking to Microsoft Graph.${retrySafeOnTransportFailure ? "" : " The create may have succeeded; inspect the list before creating again."}`,
           { clientRequestId },
         );
       }
@@ -99,7 +101,7 @@ export class GraphClient {
         try {
           return JSON.parse(bodyText) as T;
         } catch {
-          throw new AppError("graph_error", "Microsoft Graph returned a response that was not valid JSON.", { status: res.status, clientRequestId });
+          throw new AppError(retrySafeOnTransportFailure ? "graph_error" : "operation_uncertain", "Microsoft Graph returned a response that was not valid JSON.", { status: res.status, clientRequestId });
         }
       }
 
@@ -110,11 +112,14 @@ export class GraphClient {
         parsedBody = undefined;
       }
 
+      if (!retrySafeOnTransportFailure && res.status >= 500) {
+        throw new AppError("operation_uncertain", "Microsoft Graph failed while creating the item. It may have succeeded; inspect the list before creating again.", { status: res.status, clientRequestId });
+      }
       if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_RETRIES) {
-        // 429/503/504 mean the request was not processed — safe to retry even for a POST.
+        // Throttled creates can retry; a server error does not establish whether a POST landed.
         const retryAfter = Number.parseInt(res.headers.get("retry-after") ?? "", 10);
         // Honour Retry-After, but cap it — a tool call shouldn't block for minutes.
-        const waitMs = Number.isFinite(retryAfter) ? Math.min(retryAfter * 1000, MAX_RETRY_AFTER_MS) : this.backoffMs(attempt);
+        const waitMs = Number.isFinite(retryAfter) ? Math.max(0, Math.min(retryAfter * 1000, MAX_RETRY_AFTER_MS)) : this.backoffMs(attempt);
         log.warn("retryable graph error", { clientRequestId, status: res.status, attempt, waitMs, durationMs, outcome: "error" });
         await this.sleep(waitMs);
         continue;
@@ -134,7 +139,7 @@ export class GraphClient {
   }
 
   private buildUrl(pathOrUrl: string, query?: RequestOptions["query"]): string {
-    const url = new URL(pathOrUrl.startsWith("http") ? pathOrUrl : this.deps.config.graphBase + pathOrUrl);
+    const url = graphDestination(this.deps.config.graphBase, pathOrUrl);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
         if (value !== undefined) url.searchParams.set(key, String(value));

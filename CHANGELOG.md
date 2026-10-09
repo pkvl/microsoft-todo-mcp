@@ -4,6 +4,21 @@ Notable changes to this project. Format loosely based on [Keep a Changelog](http
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-09
+
+### Changed
+- Personal-account fork uses a local build and requires Node 22.12 or newer.
+- Token caches use OS encryption and MSAL cross-process locks, with separate default
+  files for read-only and read/write scopes. Existing plaintext caches require a new login.
+- Graph requests validate their destination before obtaining credentials and reject redirects.
+- Create operations use a persistent journal and optional `operationId`, and report
+  `operation_uncertain` after ambiguous failures instead of retrying a potentially successful POST.
+- Updated dependencies, tool annotations, Windows installation docs, and Windows/Linux CI.
+
+### Added
+- Tests for hostile cursors, create replay across restarts, account scoping, and native DPAPI.
+- Windows stdio smoke check using an isolated cache and no real account.
+
 ## [0.2.0] - 2026-05-12
 
 ### Added
