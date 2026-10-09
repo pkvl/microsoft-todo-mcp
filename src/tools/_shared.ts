@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AppError, toAppError } from "../graph/errors";
 import { IdempotencyCache } from "../lib/idempotency";
+import type { CreateOperations, OperationCheckpoint } from "../lib/create-operations";
 import type { IdGenerator } from "../lib/ids";
 import type { Logger } from "../lib/logger";
 import type { AuthManager } from "../auth/auth-state";
@@ -16,7 +17,7 @@ export interface ToolContext {
   auth: AuthManager;
   lists: TaskListsApi;
   tasks: TasksApi;
-  idempotency: IdempotencyCache;
+  operations: CreateOperations;
 }
 
 /** Erased tool definition used by the registry / server. */
@@ -24,7 +25,7 @@ export interface ToolDef {
   name: string;
   description: string;
   risk: RiskClass;
-  /** Zod raw shape — passed straight to `server.tool()`. */
+  /** Zod raw shape — passed straight to `server.registerTool()`. */
   inputShape: z.ZodRawShape;
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>;
 }
@@ -58,16 +59,20 @@ export function errorResult(err: unknown) {
 }
 
 /**
- * Wrap a mutating operation in the in-process idempotency cache. On a cache hit the cached
- * result is returned, tagged `_idempotent: true` so the caller knows nothing new was created.
+ * Authenticate first so a create is scoped to the actual account, then reserve it on disk.
  */
-export async function withIdempotency<T>(ctx: ToolContext, tool: string, args: unknown, run: () => Promise<T>): Promise<unknown> {
-  const key = IdempotencyCache.key({ tool, args, accountId: ctx.auth.accountId() });
-  const cached = ctx.idempotency.get(key);
-  if (cached !== undefined) {
-    return cached && typeof cached === "object" && !Array.isArray(cached) ? { ...(cached as object), _idempotent: true } : cached;
-  }
-  const result = await run();
-  ctx.idempotency.set(key, result);
-  return result;
+export async function withIdempotency<T>(ctx: ToolContext, tool: string, args: unknown, run: (checkpoint: OperationCheckpoint) => Promise<T>, resourceIdentity?: unknown): Promise<unknown> {
+  await ctx.auth.getAccessToken();
+  const { operationId, ...payload } = args as Record<string, unknown>;
+  const accountId = ctx.auth.accountId();
+  const fingerprint = IdempotencyCache.key({ tool, args: payload, accountId });
+  const key = resourceIdentity !== undefined
+    ? IdempotencyCache.key({ tool, args: resourceIdentity, accountId })
+    : operationId ? IdempotencyCache.key({ tool, args: { operationId }, accountId }) : fingerprint;
+  const result = await ctx.operations.run(key, fingerprint, operationId || resourceIdentity !== undefined ? 86_400_000 : 60_000, run);
+  return result.reused && result.value && typeof result.value === "object" && !Array.isArray(result.value)
+    ? { ...(result.value as object), _idempotent: true }
+    : result.value;
 }
+
+export const OperationId = z.string().min(1).max(128).optional().describe("Stable ID for one intended create. Reuse on retries; use a new ID for a separate item. Completed results can be replayed for 24 hours.");

@@ -37,9 +37,10 @@ export const TaskSchema = z
     createdDateTime: z.string().optional(),
     lastModifiedDateTime: z.string().optional(),
     body: z.object({ content: z.string(), contentType: z.string() }).passthrough().optional(),
-    dueDateTime: DateTimeTimeZone.optional(),
-    reminderDateTime: DateTimeTimeZone.optional(),
-    completedDateTime: DateTimeTimeZone.optional(),
+    dueDateTime: DateTimeTimeZone.nullable().optional(),
+    reminderDateTime: DateTimeTimeZone.nullable().optional(),
+    completedDateTime: DateTimeTimeZone.nullable().optional(),
+    startDateTime: DateTimeTimeZone.nullable().optional(),
     categories: z.array(z.string()).optional(),
     checklistItems: z.array(ChecklistItemSchema).optional(),
   })

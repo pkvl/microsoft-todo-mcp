@@ -1,23 +1,23 @@
 # Security
 
-## Reporting a vulnerability
+Report security vulnerabilities through GitHub's private security advisory flow for this fork; do not include tokens or private task contents in public issues.
 
-Please **don't** open a public issue for security problems. Instead, open a private security advisory:
-**GitHub → repository → Security → Report a vulnerability** (`/security/advisories/new`). I'll acknowledge within a few days.
+## Credentials and requests
 
-## What this tool touches
+- Delegated Microsoft Graph scopes are `Tasks.ReadWrite`, or `Tasks.Read` with `--scope-readonly`. The default public-client identity is Microsoft Graph Command Line Tools; there is no client secret.
+- Refresh-token persistence uses MSAL Node Extensions and the OS credential store, with encryption required. Windows DPAPI is scoped to the current user. Separate MCP clients share a cross-process persistence lock.
+- Every Graph request is limited to the configured HTTPS origin and supported To Do routes. Redirects are disabled. Cursors and next links cannot select another destination.
+- Graph base and Microsoft authority overrides are trusted local configuration. Do not set them to untrusted endpoints.
+- Logging uses stderr. Native persistence diagnostics are suppressed. Task bodies and bearer tokens are not intentionally logged.
 
-- Authenticates to Microsoft Graph as **you** via delegated auth (device-code flow), with the **`Tasks.ReadWrite`** scope only — your To Do lists, tasks, and checklist items. Nothing else (no mail, files, calendar). Running with `--scope-readonly` narrows that to `Tasks.Read`.
-- Caches the MSAL token (which contains a **refresh token**) at `~/.config/microsoft-todo-mcp/token-cache.json` with `0600` permissions. Treat that file like an SSH private key. `microsoft-todo-mcp logout` deletes it.
-- Uses a **public client** — there is no client secret anywhere in this project or its config. By default the client id is Microsoft's well-known *Microsoft Graph CLI* public client (so the consent screen reads "Microsoft Graph Command Line Tools"); set `MS_TODO_CLIENT_ID` to use your own Entra app. A public-client id is not sensitive.
-- Sends **no telemetry** and makes no network calls other than to Microsoft Graph and (during `login`) the Microsoft identity platform. Logs are written to stderr on your machine and nowhere else; token-like values are redacted from logs and error output.
+## Local data and limits
 
-## Hardening options
+The create-operation journal contains task results and notes in plaintext, but no tokens. Store it in a private user directory. Replay expiry does not delete files. Pending records and stale locks require inspection before recovery, so the server does not duplicate an uncertain create.
 
-- `--readonly` — expose only read tools (runtime guard).
-- `--no-destructive` — expose writes but not deletes.
-- `--scope-readonly` — request a `Tasks.Read`-only token (a real capability boundary, not just a runtime guard; requires re-login).
+Encryption protects credentials at rest; a process running as the same OS user may still access them. Logout clears persistence, but already-running clients can retain an access token until expiry; stop them to complete a local sign-out.
 
-## Dependencies
+The old plaintext cache is not migrated automatically. Sign in with the new encrypted cache, then remove any old cache yourself. See `docs/HARDENING.md`.
 
-Runtime dependencies are kept to a minimum: `@modelcontextprotocol/sdk`, `@azure/msal-node`, `zod`. HTTP uses the Node built-in `fetch`; logging is hand-rolled. Fewer dependencies, smaller attack surface.
+`--readonly` and `--no-destructive` control exposed tools; `--scope-readonly` controls requested Microsoft scopes and uses a separate default cache. Use separate paths when overriding read-only and read/write token caches.
+
+Runtime and build dependencies are locked in `package-lock.json`. This private fork is not published under the upstream npm package name. Use a reviewed local build.

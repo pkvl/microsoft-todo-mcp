@@ -18,12 +18,15 @@ export interface AppConfig {
   clientId: string;
   authority: string;
   tokenCachePath: string;
+  operationsPath: string;
   /** Request only `Tasks.Read` (true read-only capability; requires re-login). */
   scopeReadonly: boolean;
   /** Runtime guard: hide write + destructive tools. */
   readonly: boolean;
-  /** Runtime guard: hide destructive (delete) tools only. */
+  /** Runtime guard: hide moves and deletes. */
   noDestructive: boolean;
+  /** Explicit opt-in for direct deletion tools; moving remains independent. */
+  allowDelete: boolean;
   /** Soft cap on items returned by list tools (page-granular). */
   maxResults: number;
   graphBase: string;
@@ -34,10 +37,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     clientId: env.MS_TODO_CLIENT_ID ?? PUBLISHED_CLIENT_ID,
     authority: env.MS_TODO_AUTHORITY ?? "https://login.microsoftonline.com/common",
-    tokenCachePath: env.MS_TODO_TOKEN_CACHE ?? join(homedir(), ".config", "microsoft-todo-mcp", "token-cache.json"),
+    tokenCachePath: env.MS_TODO_TOKEN_CACHE ?? join(homedir(), ".config", "microsoft-todo-mcp", envBool(env.MS_TODO_SCOPE_READONLY) ? "token-cache-read.enc" : "token-cache.enc"),
+    operationsPath: env.MS_TODO_OPERATIONS_DIR ?? join(homedir(), ".config", "microsoft-todo-mcp", "operations"),
     scopeReadonly: envBool(env.MS_TODO_SCOPE_READONLY),
     readonly: envBool(env.MS_TODO_READONLY),
     noDestructive: envBool(env.MS_TODO_NO_DESTRUCTIVE),
+    allowDelete: envBool(env.MS_TODO_ALLOW_DELETE),
     maxResults: clampInt(env.MS_TODO_MAX_RESULTS, 200, 1, 1000),
     graphBase: (env.MS_TODO_GRAPH_BASE ?? "https://graph.microsoft.com/v1.0").replace(/\/+$/, ""),
     logLevel: env.LOG_LEVEL ?? "info",
