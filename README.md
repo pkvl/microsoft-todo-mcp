@@ -23,7 +23,7 @@ Configure your MCP client to run `node` with the absolute path to `dist/index.js
 
 - Authentication: `auth_status`, `sign_in`.
 - Lists: `list_task_lists`, `create_task_list`, `update_task_list`, `delete_task_list`.
-- Tasks: `list_tasks`, `get_task`, `create_task`, `update_task`, `complete_task`, `delete_task`.
+- Tasks: `list_tasks`, `get_task`, `create_task`, `update_task`, `complete_task`, `move_task`, `delete_task`.
 - Checklists: `list_checklist_items`, `add_checklist_item`, `update_checklist_item`, `delete_checklist_item`.
 
 Tasks support titles, plain-text notes, due dates, reminders, importance, status and categories. Date-time inputs accept a local ISO string in the host's timezone or an explicit `{ dateTime, timeZone }` object. List tools return `hasMore` and a continuation `cursor`; follow every page when collecting tasks for analytics.
@@ -33,7 +33,7 @@ The three create tools accept `operationId`. Reuse the ID on retries; use a new 
 ## Modes
 
 - `--readonly` hides write and delete tools.
-- `--no-destructive` hides delete tools while allowing creation and updates.
+- `--no-destructive` hides delete and move tools while allowing creation and updates.
 - `--scope-readonly` requests `Tasks.Read` and uses a separate default credential cache. Sign in separately for that mode.
 
 ## Configuration
@@ -52,6 +52,10 @@ The three create tools accept `operationId`. Reuse the ID on retries; use a new 
 Credentials are encrypted; the create journal contains task results in plaintext and must stay in a private directory. Old plaintext token caches are not automatically imported. See [storage notes](docs/HARDENING.md#encrypted-credentials).
 
 CLI commands: `serve` (default), `login`, `logout`, `whoami`, `--version`, `--help`.
+
+`move_task` uses copy/verify/delete because the current Graph To Do API has no native move action. It preserves supported fields, rich notes, checklist items and linked resources. Task/checklist/link IDs and creation timestamps change. Recurrence, attachments, custom extensions and Flagged Emails lists are rejected before writing. Source edits or failed verification leave the source intact; partial copies remain available for inspection. See [move limits and recovery](docs/HARDENING.md#moves-and-deletion).
+
+To expose task moves/deletes, run without `--no-destructive` and use client tool filtering to hide `delete_task_list` and `delete_checklist_item` if only task operations are wanted. Read-only mode still hides all writes. Existing `Tasks.ReadWrite` consent is sufficient.
 
 ## Development
 

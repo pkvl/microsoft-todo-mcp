@@ -10,7 +10,10 @@ const Entry = z.object({
   outcome: z.enum(["pending", "completed"]),
   expiresAt: z.number(),
   result: z.unknown().optional(),
+  progress: z.unknown().optional(),
 });
+
+export type OperationCheckpoint = (progress: unknown) => Promise<void>;
 
 /** A pending record is written BEFORE sending a create, and survives a process crash. */
 export class CreateOperations {
@@ -18,7 +21,7 @@ export class CreateOperations {
 
   constructor(private readonly directory: string, private readonly now: () => number = Date.now) {}
 
-  run(key: string, fingerprint: string, ttlMs: number, create: () => Promise<unknown>): Promise<{ value: unknown; reused: boolean }> {
+  run(key: string, fingerprint: string, ttlMs: number, create: (checkpoint: OperationCheckpoint) => Promise<unknown>): Promise<{ value: unknown; reused: boolean }> {
     if (!/^[a-f0-9]{64}$/.test(key)) return Promise.reject(new AppError("validation_error", "Invalid operation key."));
     const active = this.active.get(key);
     if (active) {
@@ -30,7 +33,7 @@ export class CreateOperations {
     return promise;
   }
 
-  private async execute(key: string, fingerprint: string, ttlMs: number, create: () => Promise<unknown>) {
+  private async execute(key: string, fingerprint: string, ttlMs: number, create: (checkpoint: OperationCheckpoint) => Promise<unknown>) {
     const path = join(this.directory, `${key}.json`);
     const previous = await this.locked(key, async () => {
       let entry: z.infer<typeof Entry> | undefined;
@@ -43,29 +46,38 @@ export class CreateOperations {
       }
       if (entry && (entry.outcome === "pending" || entry.expiresAt > this.now())) {
         if (entry.fingerprint !== fingerprint) throw new AppError("conflict", "operationId was already used with different arguments.");
-        if (entry.outcome === "pending") throw new AppError("operation_uncertain", "This create is running or its outcome is unknown. Inspect the list before issuing a new operationId.");
+        if (entry.outcome === "pending") throw new AppError("operation_uncertain", "This operation is running or its outcome is unknown. Inspect the source and destination before retrying.", { details: entry.progress });
         return { value: entry.result, reused: true };
       }
       await this.write(path, { version: 1, fingerprint, outcome: "pending", expiresAt: 0 });
       return undefined;
     });
     if (previous) return previous;
+    let progress: unknown;
+    const checkpoint: OperationCheckpoint = async (next) => {
+      progress = next;
+      await this.locked(key, () => this.write(path, { version: 1, fingerprint, outcome: "pending", expiresAt: 0, progress }));
+    };
     let value: unknown;
     try {
-      value = await create();
+      value = await create(checkpoint);
     } catch (err) {
       // Auth, permission, validation and other definite rejections may be retried.
       // Unknown failures and ambiguous POST outcomes retain the pending marker.
-      if (err instanceof AppError && err.code !== "operation_uncertain") {
+      if (progress === undefined && err instanceof AppError && err.code !== "operation_uncertain") {
         await this.locked(key, () => unlink(path));
         throw err;
       }
+      if (progress !== undefined) {
+        throw new AppError("operation_uncertain", "The move stopped after a write may have occurred. Inspect both lists before retrying; the journal retains the known destination and phase.", { details: progress });
+      }
+      if (err instanceof AppError) throw err;
       throw new AppError("operation_uncertain", "The create may have succeeded. Inspect the list before issuing a new operationId.");
     }
     try {
       await this.locked(key, () => this.write(path, { version: 1, fingerprint, outcome: "completed", expiresAt: this.now() + ttlMs, result: value }));
     } catch {
-      throw new AppError("operation_uncertain", "The item was created, but its result could not be recorded. Inspect the list before creating again.");
+      throw new AppError("operation_uncertain", "The operation succeeded, but its result could not be recorded. Inspect the lists before retrying.", { details: progress });
     }
     return { value, reused: false };
   }

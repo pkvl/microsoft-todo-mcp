@@ -27,6 +27,7 @@ interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
   traceId?: string;
+  ifMatch?: string;
 }
 
 const RETRYABLE_STATUS = new Set([429, 503, 504]);
@@ -69,6 +70,7 @@ export class GraphClient {
             Authorization: `Bearer ${token}`,
             "client-request-id": clientRequestId,
             Accept: "application/json",
+            ...(opts.ifMatch ? { "If-Match": opts.ifMatch } : {}),
             ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
           },
           body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,

@@ -2,6 +2,8 @@ import { collectPages, type Page } from "../graph/pagination";
 import type { GraphClient } from "../graph/client";
 import { toGraphDateTime, type DateTimeInput, type Importance, type TaskStatus } from "../lib/schema";
 import { ChecklistItemSchema, TaskSchema, type ChecklistItem, type Task } from "./types";
+import { moveTask, type MoveTaskInput } from "./move-task";
+import type { OperationCheckpoint } from "../lib/create-operations";
 
 const PAGE_SIZE = 100;
 
@@ -86,6 +88,10 @@ export class TasksApi {
 
   async remove(listId: string, taskId: string, traceId?: string): Promise<void> {
     await this.graph.request<void>("DELETE", `/me/todo/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`, { traceId });
+  }
+
+  move(input: MoveTaskInput, checkpoint: OperationCheckpoint, traceId?: string) {
+    return moveTask(this.graph, input, checkpoint, traceId);
   }
 
   async listChecklist(listId: string, taskId: string, traceId?: string): Promise<ChecklistItem[]> {

@@ -3,7 +3,7 @@ import { allTools } from "../src/tools/registry";
 
 describe("tool registry", () => {
   it("exposes the expected tool surface", () => {
-    expect(allTools).toHaveLength(16);
+    expect(allTools).toHaveLength(17);
   });
 
   it("has unique tool names", () => {

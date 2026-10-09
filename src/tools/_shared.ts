@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AppError, toAppError } from "../graph/errors";
 import { IdempotencyCache } from "../lib/idempotency";
-import type { CreateOperations } from "../lib/create-operations";
+import type { CreateOperations, OperationCheckpoint } from "../lib/create-operations";
 import type { IdGenerator } from "../lib/ids";
 import type { Logger } from "../lib/logger";
 import type { AuthManager } from "../auth/auth-state";
@@ -61,13 +61,15 @@ export function errorResult(err: unknown) {
 /**
  * Authenticate first so a create is scoped to the actual account, then reserve it on disk.
  */
-export async function withIdempotency<T>(ctx: ToolContext, tool: string, args: unknown, run: () => Promise<T>): Promise<unknown> {
+export async function withIdempotency<T>(ctx: ToolContext, tool: string, args: unknown, run: (checkpoint: OperationCheckpoint) => Promise<T>, resourceIdentity?: unknown): Promise<unknown> {
   await ctx.auth.getAccessToken();
   const { operationId, ...payload } = args as Record<string, unknown>;
   const accountId = ctx.auth.accountId();
   const fingerprint = IdempotencyCache.key({ tool, args: payload, accountId });
-  const key = operationId ? IdempotencyCache.key({ tool, args: { operationId }, accountId }) : fingerprint;
-  const result = await ctx.operations.run(key, fingerprint, operationId ? 86_400_000 : 60_000, run);
+  const key = resourceIdentity !== undefined
+    ? IdempotencyCache.key({ tool, args: resourceIdentity, accountId })
+    : operationId ? IdempotencyCache.key({ tool, args: { operationId }, accountId }) : fingerprint;
+  const result = await ctx.operations.run(key, fingerprint, operationId || resourceIdentity !== undefined ? 86_400_000 : 60_000, run);
   return result.reused && result.value && typeof result.value === "object" && !Array.isArray(result.value)
     ? { ...(result.value as object), _idempotent: true }
     : result.value;

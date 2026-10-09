@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DateTimeInput, Importance, TaskStatus } from "../lib/schema";
 import { defineTool, OperationId, withIdempotency } from "./_shared";
+import { AppError } from "../graph/errors";
 
 export const taskTools = [
   defineTool({
@@ -119,12 +120,31 @@ export const taskTools = [
   }),
 
   defineTool({
+    name: "move_task",
+    description: "Move a task to another list by copying and verifying it, then deleting the source. IDs and creation timestamps change. Preserves supported fields, checklist and linked resources; rejects recurring tasks, attachments, extensions and Flagged Emails lists. A partial failure retains known destination IDs in the journal; inspect both lists before retrying. Deleting the source cannot be undone.",
+    risk: "destructive",
+    input: {
+      sourceListId: z.string().min(1),
+      taskId: z.string().min(1),
+      destinationListId: z.string().min(1),
+    },
+    handler: (args, ctx) => withIdempotency(ctx, "move_task", args,
+      (checkpoint) => ctx.tasks.move(args, checkpoint, ctx.ids.uuid()),
+      { sourceListId: args.sourceListId, taskId: args.taskId }),
+  }),
+
+  defineTool({
     name: "delete_task",
     description: "Permanently delete a task. This cannot be undone.",
     risk: "destructive",
     input: { listId: z.string(), taskId: z.string() },
     handler: async (args, ctx) => {
-      await ctx.tasks.remove(args.listId, args.taskId, ctx.ids.uuid());
+      try {
+        await ctx.tasks.remove(args.listId, args.taskId, ctx.ids.uuid());
+      } catch (err) {
+        if (!(err instanceof AppError) || err.code !== "not_found") throw err;
+        return { deleted: true, taskId: args.taskId, alreadyAbsent: true };
+      }
       return { deleted: true, taskId: args.taskId };
     },
   }),

@@ -14,7 +14,7 @@ export function graphDestination(base: string, pathOrUrl: string): URL {
     }
     // Reject encoded separators, dot segments and nested escaping. IDs remain URI-encoded.
     if (/%(?:2f|5c|2e|25|00)/i.test(url.pathname)) throw new Error("Escaped path");
-    if (!/^\/v1\.0\/me\/todo\/lists(?:\/[^/]+(?:\/tasks(?:\/[^/]+(?:\/(?:checklistItems|linkedResources)(?:\/[^/]+)?)?)?)?)?$/.test(url.pathname)) {
+    if (!/^\/v1\.0\/me\/todo\/lists(?:\/[^/]+(?:\/tasks(?:\/[^/]+(?:\/(?:checklistItems|linkedResources|attachments|extensions)(?:\/[^/]+)?)?)?)?)?$/.test(url.pathname)) {
       throw new Error("Outside To Do API");
     }
     return url;

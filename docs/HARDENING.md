@@ -59,6 +59,16 @@ Uncertain outcomes never expire automatically. Inspect the list first. If the it
 
 The journal is at `~/.config/microsoft-todo-mcp/operations` (override: `MS_TODO_OPERATIONS_DIR`). It stores task results in plaintext, including notes, but no tokens. Keep it in a private directory; do not sync or commit it. Expiry governs replay, not file deletion; records remain on disk. A process crash during a short file lock can leave a `.lock`. Stop clients and inspect the list before removing a stale lock. Corrupt records fail closed.
 
+## Moves and deletion
+
+`move_task` accepts `sourceListId`, `taskId`, and `destinationListId`. The current [Graph task method surface](https://learn.microsoft.com/en-us/graph/api/resources/todotask?view=graph-rest-1.0) has no native To Do move action. This tool creates a destination task, copies all checklist and linked-resource pages, verifies the supported values, rechecks the source, and then deletes it. HTML notes, categories, status, importance, nullable due/reminder/start/completed dates and reminder settings are copied. IDs and creation timestamps are regenerated.
+
+Recurring tasks, attachments, custom extensions, and moves involving Flagged Emails are refused before any writes. Other platform-specific metadata and UI relationships are outside this implementation. A destination mismatch or observed source change prevents source deletion. Where Graph supplies an ETag, deletion includes `If-Match`; this is still a sequence of separate Graph requests, not an atomic move. A concurrent edit after the final source check remains a limitation when the API does not enforce a conditional delete.
+
+Moves are journaled under an account/source-task identity so two clients cannot move the same source independently. Successful results replay for 24 hours. Pending move records include the known destination ID and phase and never expire automatically. Partial failures retain the destination rather than rolling back a potentially valuable copy. Inspect both lists; stop clients and resolve partial copies before manually removing the corresponding pending journal record. Retrying with different destination arguments does not bypass the source reservation. The journal is plaintext, as described above.
+
+`delete_task` performs Graph deletion and treats an already-absent task as success. Moves and all deletes are classified as destructive, so `--readonly` and `--no-destructive` hide them. Clients may expose task moves/deletes while independently hiding list/checklist deletion. The consent scope remains `Tasks.ReadWrite`.
+
 ## Verification
 
 Run `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build`. On Windows, `npm run smoke` also connects to the built CLI over stdio and checks tool modes and signed-out status in an isolated cache. Windows tests exercise actual DPAPI encryption, locking and clearing with synthetic credentials. Other tests use fake Graph responses and temporary directories. No real account is accessed.

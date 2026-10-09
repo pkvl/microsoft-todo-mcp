@@ -8,10 +8,10 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 // Exercises the built CLI with synthetic, isolated cache paths. No Microsoft sign-in.
 const directory = await mkdtemp(join(tmpdir(), "todo-mcp-smoke-"));
 try {
-  for (const mode of ["--no-destructive", "--readonly"]) {
+  for (const mode of ["--no-destructive", "--readonly", "all-tools"]) {
     const transport = new StdioClientTransport({
       command: process.execPath,
-      args: [resolve("dist/index.js"), mode],
+      args: [resolve("dist/index.js"), ...(mode === "all-tools" ? [] : [mode])],
       env: {
         ...process.env,
         MS_TODO_CLIENT_ID: "14d82eec-204b-4c2f-b7e8-296a70dab67e",
@@ -28,8 +28,9 @@ try {
     try {
       await client.connect(transport);
       const { tools } = await client.listTools();
-      assert.equal(tools.length, mode === "--readonly" ? 6 : 13);
-      assert.ok(tools.every((tool) => !tool.name.startsWith("delete_")));
+      assert.equal(tools.length, mode === "--readonly" ? 6 : mode === "all-tools" ? 17 : 13);
+      assert.equal(tools.some((tool) => tool.name === "delete_task"), mode === "all-tools");
+      assert.equal(tools.some((tool) => tool.name === "move_task"), mode === "all-tools");
       if (mode === "--readonly") assert.ok(tools.every((tool) => tool.annotations?.readOnlyHint));
       else assert.ok(tools.some((tool) => tool.name === "create_task"));
       const status = await client.callTool({ name: "auth_status", arguments: {} });
