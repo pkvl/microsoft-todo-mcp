@@ -42,6 +42,8 @@ export async function runServer(config: AppConfig = loadConfig()): Promise<void>
   for (const tool of allTools) {
     if (config.readonly && tool.risk !== "read") { skipped++; continue; }
     if (config.noDestructive && tool.risk === "destructive") { skipped++; continue; }
+    // All direct deletion tools use the delete_ prefix; move has its own verified deletion.
+    if (!config.allowDelete && tool.name.startsWith("delete_")) { skipped++; continue; }
     registered++;
 
     server.registerTool(tool.name, {
@@ -73,6 +75,7 @@ export async function runServer(config: AppConfig = loadConfig()): Promise<void>
     clientIdConfigured: Boolean(config.clientId),
     readonly: config.readonly,
     noDestructive: config.noDestructive,
+    allowDelete: config.allowDelete,
     scopeReadonly: config.scopeReadonly,
   });
 

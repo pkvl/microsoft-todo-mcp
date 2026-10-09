@@ -26,6 +26,7 @@ function flagOverrides(flags: Set<string>): Record<string, string> {
   const overrides: Record<string, string> = {};
   if (flags.has("readonly")) overrides.MS_TODO_READONLY = "1";
   if (flags.has("no-destructive")) overrides.MS_TODO_NO_DESTRUCTIVE = "1";
+  if (flags.has("allow-delete")) overrides.MS_TODO_ALLOW_DELETE = "1";
   if (flags.has("scope-readonly")) overrides.MS_TODO_SCOPE_READONLY = "1";
   return overrides;
 }
@@ -42,11 +43,13 @@ Usage:
 
 Flags (serve):
   --readonly         Disable all write and destructive tools
-  --no-destructive   Disable destructive (delete) tools only
+  --no-destructive   Disable move and delete tools
+  --allow-delete     Enable direct deletion tools (hidden by default)
   --scope-readonly   Request only the Tasks.Read scope (requires re-login)
 
 Env:
   MS_TODO_CLIENT_ID, MS_TODO_AUTHORITY, MS_TODO_TOKEN_CACHE, MS_TODO_OPERATIONS_DIR,
+  MS_TODO_ALLOW_DELETE (1/true enables deletion tools),
   MS_TODO_MAX_RESULTS, MS_TODO_GRAPH_BASE, LOG_LEVEL
 
 First-time setup: docs/ENTRA-APP-SETUP.md

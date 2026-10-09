@@ -12,12 +12,12 @@ Requires Node.js 22.12 or newer and an available native credential store. Window
 npm ci
 npm run build
 node dist/index.js login
-node dist/index.js serve --no-destructive
+node dist/index.js serve
 ```
 
 Complete Microsoft's device-code sign-in with your personal account. No client secret is required. The default identity is Microsoft Graph Command Line Tools. To use your own registration, set `MS_TODO_CLIENT_ID` to a public-client app supporting personal Microsoft accounts.
 
-Configure your MCP client to run `node` with the absolute path to `dist/index.js` and `--no-destructive`. See [local client setup and migration](docs/HARDENING.md).
+Configure your MCP client to run `node` with the absolute path to `dist/index.js`. Direct deletion tools are hidden by default; moving remains available. See [local client setup and migration](docs/HARDENING.md).
 
 ## Tools
 
@@ -28,11 +28,15 @@ Configure your MCP client to run `node` with the absolute path to `dist/index.js
 
 Tasks support titles, plain-text notes, due dates, reminders, importance, status and categories. Date-time inputs accept a local ISO string in the host's timezone or an explicit `{ dateTime, timeZone }` object. List tools return `hasMore` and a continuation `cursor`; follow every page when collecting tasks for analytics.
 
+The default server exposes 14 tools. `delete_task`, `delete_task_list`, and `delete_checklist_item` require `--allow-delete` or `MS_TODO_ALLOW_DELETE=1`, exposing all 17. Moving still deletes the source after verifying its destination copy.
+
 The three create tools accept `operationId`. Reuse the ID on retries; use a new ID for a separate intended item. If a create returns `operation_uncertain`, inspect the list before creating again. See [retry behavior and its limits](docs/HARDENING.md#creates-and-retries).
 
 ## Modes
 
-- `--readonly` hides write and delete tools.
+- Default: hide direct deletion tools while keeping creation, updates, completion, and moves.
+- `--allow-delete` enables direct deletion tools; clients may still filter individual tools.
+- `--readonly` hides all write tools, including moves and deletes, even with `--allow-delete`.
 - `--no-destructive` hides delete and move tools while allowing creation and updates.
 - `--scope-readonly` requests `Tasks.Read` and uses a separate default credential cache. Sign in separately for that mode.
 
@@ -47,6 +51,7 @@ The three create tools accept `operationId`. Reuse the ID on retries; use a new 
 | `MS_TODO_MAX_RESULTS` | 200, a soft cap per list-tool call |
 | `MS_TODO_GRAPH_BASE` | `https://graph.microsoft.com/v1.0`; trusted configuration for sovereign endpoints |
 | `MS_TODO_READONLY` / `MS_TODO_NO_DESTRUCTIVE` / `MS_TODO_SCOPE_READONLY` | Environment equivalents of the flags |
+| `MS_TODO_ALLOW_DELETE` | Off by default; `1` or `true` enables direct deletion tools unless a stricter mode hides them |
 | `LOG_LEVEL` | `info`; logs use stderr, never the MCP stdout stream |
 
 Credentials are encrypted; the create journal contains task results in plaintext and must stay in a private directory. Old plaintext token caches are not automatically imported. See [storage notes](docs/HARDENING.md#encrypted-credentials).
@@ -55,7 +60,7 @@ CLI commands: `serve` (default), `login`, `logout`, `whoami`, `--version`, `--he
 
 `move_task` uses copy/verify/delete because the current Graph To Do API has no native move action. It preserves supported fields, rich notes, checklist items and linked resources. Task/checklist/link IDs and creation timestamps change. Recurrence, attachments, returned custom extensions and Flagged Emails lists are rejected before writing. Graph can omit custom extensions, so unknown extension data is not preserved; use the native app for tasks carrying such data. Source edits or failed verification leave the source intact; partial copies remain available for inspection. See [move limits and recovery](docs/HARDENING.md#moves-and-deletion).
 
-To expose task moves/deletes, run without `--no-destructive` and use client tool filtering to hide `delete_task_list` and `delete_checklist_item` if only task operations are wanted. Read-only mode still hides all writes. Existing `Tasks.ReadWrite` consent is sufficient.
+To keep moving without exposing deletion tools, use the default mode. To opt into task deletion, add `--allow-delete` and use client tool filtering to hide `delete_task_list` and `delete_checklist_item` if only task operations are wanted. `--no-destructive` hides both moves and deletes even with the opt-in. Existing `Tasks.ReadWrite` consent is sufficient.
 
 ## Development
 

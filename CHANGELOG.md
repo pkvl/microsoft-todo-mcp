@@ -17,6 +17,9 @@ Notable changes to this project. Format loosely based on [Keep a Changelog](http
 - Repeated task deletion reports success when the task is already absent.
 - Task schemas accept Graph's nullable dates and include start dates.
 - `--no-destructive` hides moves as well as deletes.
+- Direct deletion tools are hidden by default. `--allow-delete` or
+  `MS_TODO_ALLOW_DELETE=1` opts in; moves remain available independently, and
+  read-only/no-destructive restrictions take precedence.
 - Read extension data through task expansion instead of the collection endpoint, which
   returned 404 in the personal-account live test. Omitted expansions are accepted;
   undiscoverable custom extension data is outside move preservation.

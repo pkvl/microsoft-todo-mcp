@@ -8,12 +8,12 @@ This fork is maintained at https://github.com/pkvl/microsoft-todo-mcp. The upstr
 npm ci
 npm run build
 node dist/index.js login
-node dist/index.js serve --no-destructive
+node dist/index.js serve
 ```
 
 Login requires your interaction with Microsoft's device-code page. No client secret is required. `MS_TODO_CLIENT_ID` is an optional override for a public-client registration supporting personal Microsoft accounts.
 
-Configure your MCP client to run `node` with the absolute path to this checkout's `dist/index.js` and `--no-destructive`. A JSON client configuration example:
+Configure your MCP client to run `node` with the absolute path to this checkout's `dist/index.js`. Default mode hides direct deletion tools and keeps moving available. A JSON client configuration example:
 
 ```json
 {
@@ -21,8 +21,7 @@ Configure your MCP client to run `node` with the absolute path to this checkout'
     "microsoft-todo": {
       "command": "node",
       "args": [
-        "C:/Development/to-do-enhancer/microsoft-todo-mcp/dist/index.js",
-        "--no-destructive"
+        "C:/Development/to-do-enhancer/microsoft-todo-mcp/dist/index.js"
       ]
     }
   }
@@ -69,7 +68,7 @@ On 2026-10-09, a live personal-account stdio test verified one temporary task wi
 
 Moves are journaled under an account/source-task identity so two clients cannot move the same source independently. Successful results replay for 24 hours. Pending move records include the known destination ID and phase and never expire automatically. Partial failures retain the destination rather than rolling back a potentially valuable copy. Inspect both lists; stop clients and resolve partial copies before manually removing the corresponding pending journal record. Retrying with different destination arguments does not bypass the source reservation. The journal is plaintext, as described above.
 
-`delete_task` performs Graph deletion and treats an already-absent task as success. Moves and all deletes are classified as destructive, so `--readonly` and `--no-destructive` hide them. Clients may expose task moves/deletes while independently hiding list/checklist deletion. The consent scope remains `Tasks.ReadWrite`.
+Direct deletion tools (`delete_task`, `delete_task_list`, `delete_checklist_item`) are not registered by default, so even an explicit `tools/call` cannot invoke them. Enable them only with `--allow-delete` or `MS_TODO_ALLOW_DELETE=1` / `true`; client tool filtering can further restrict them. `delete_task` treats an already-absent task as success. Moves and all deletes are classified as destructive, so `--readonly` and `--no-destructive` still hide them even with deletion enabled. Moving remains available in default mode and still deletes the source after verifying the copy. This is a tool-registration guard, not a Graph permission restriction; the consent scope remains `Tasks.ReadWrite`.
 
 ## Verification
 

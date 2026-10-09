@@ -23,8 +23,10 @@ export interface AppConfig {
   scopeReadonly: boolean;
   /** Runtime guard: hide write + destructive tools. */
   readonly: boolean;
-  /** Runtime guard: hide destructive (delete) tools only. */
+  /** Runtime guard: hide moves and deletes. */
   noDestructive: boolean;
+  /** Explicit opt-in for direct deletion tools; moving remains independent. */
+  allowDelete: boolean;
   /** Soft cap on items returned by list tools (page-granular). */
   maxResults: number;
   graphBase: string;
@@ -40,6 +42,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     scopeReadonly: envBool(env.MS_TODO_SCOPE_READONLY),
     readonly: envBool(env.MS_TODO_READONLY),
     noDestructive: envBool(env.MS_TODO_NO_DESTRUCTIVE),
+    allowDelete: envBool(env.MS_TODO_ALLOW_DELETE),
     maxResults: clampInt(env.MS_TODO_MAX_RESULTS, 200, 1, 1000),
     graphBase: (env.MS_TODO_GRAPH_BASE ?? "https://graph.microsoft.com/v1.0").replace(/\/+$/, ""),
     logLevel: env.LOG_LEVEL ?? "info",
