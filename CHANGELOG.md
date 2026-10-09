@@ -10,13 +10,16 @@ Notable changes to this project. Format loosely based on [Keep a Changelog](http
 - `move_task`: copy supported fields, rich body, checklist and linked resources to another
   list; verify the copy and recheck the source before deletion. Persistent checkpoints retain
   known destination IDs on partial failures and prevent concurrent/retried source moves.
-- Reject moves with recurrence, attachments, custom extensions, or Flagged Emails lists.
+- Reject moves with recurrence, attachments, returned custom extensions, or Flagged Emails lists.
 - Move/deletion failure tests and an all-tools stdio smoke mode.
 
 ### Changed
 - Repeated task deletion reports success when the task is already absent.
 - Task schemas accept Graph's nullable dates and include start dates.
 - `--no-destructive` hides moves as well as deletes.
+- Read extension data through task expansion instead of the collection endpoint, which
+  returned 404 in the personal-account live test. Omitted expansions are accepted;
+  undiscoverable custom extension data is outside move preservation.
 
 ## [0.2.1] - 2026-10-09
 

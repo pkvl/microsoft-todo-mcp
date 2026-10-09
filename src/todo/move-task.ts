@@ -55,10 +55,13 @@ export async function moveTask(graph: GraphClient, input: MoveTaskInput, checkpo
   }
 
   async function snapshot(path: string) {
-    const task = TaskSchema.parse(await graph.request("GET", path, { traceId }));
+    const task = TaskSchema.parse(await graph.request("GET", path, { traceId, query: { "$expand": "extensions" } }));
     if (task.recurrence || task.hasAttachments) throw new AppError("validation_error", "Move cannot preserve recurring rules or attachments. The original task has not been deleted.");
     const attachments = await collection(`${path}/attachments`);
-    const extensions = await collection(`${path}/extensions`);
+    // To Do returns 404 for GET /extensions and can omit the requested expansion.
+    // Extensions that Graph does not expose cannot be discovered or preserved.
+    const extensions = task.extensions ?? [];
+    if (!Array.isArray(extensions)) throw new AppError("graph_error", "Microsoft Graph returned an invalid extensions value. Move stopped before deleting the original.");
     if (attachments.length || extensions.length) throw new AppError("validation_error", "Move cannot preserve attachments or custom extensions. The original task has not been deleted.");
     const checklist = (await collection(`${path}/checklistItems`)).map((item) => {
       const parsed = ChecklistItemSchema.parse(item);

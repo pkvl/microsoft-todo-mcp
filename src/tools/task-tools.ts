@@ -121,7 +121,7 @@ export const taskTools = [
 
   defineTool({
     name: "move_task",
-    description: "Move a task to another list by copying and verifying it, then deleting the source. IDs and creation timestamps change. Preserves supported fields, checklist and linked resources; rejects recurring tasks, attachments, extensions and Flagged Emails lists. A partial failure retains known destination IDs in the journal; inspect both lists before retrying. Deleting the source cannot be undone.",
+    description: "Move a task to another list by copying and verifying it, then deleting the source. IDs and creation timestamps change. Preserves supported fields, checklist and linked resources; rejects recurring tasks, attachments, returned extensions and Flagged Emails lists. Graph may omit custom extensions; unknown extension data is not preserved, so use the native app for tasks carrying such data. A partial failure retains known destination IDs in the journal; inspect both lists before retrying. Deleting the source cannot be undone.",
     risk: "destructive",
     input: {
       sourceListId: z.string().min(1),

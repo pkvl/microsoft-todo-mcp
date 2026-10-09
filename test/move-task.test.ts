@@ -13,7 +13,7 @@ const input = { sourceListId: "source", taskId: "old", destinationListId: "desti
 const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
 
-function fixture(options: { recurrence?: boolean; attachments?: boolean; extensions?: boolean; flagged?: boolean; mismatch?: boolean; edited?: boolean; failure?: string; failureCode?: "permission_denied"; deleteAbsent?: boolean; paged?: boolean } = {}) {
+function fixture(options: { recurrence?: boolean; attachments?: boolean; extensions?: boolean; omittedExtensions?: boolean; invalidExtensions?: boolean; flagged?: boolean; mismatch?: boolean; edited?: boolean; failure?: string; failureCode?: "permission_denied"; deleteAbsent?: boolean; paged?: boolean } = {}) {
   const source = {
     id: "old", title: "Rich task", body: { content: "<p>Keep <b>HTML</b></p>", contentType: "html" },
     status: "completed", categories: ["Work", "Personal"], importance: "high", isReminderOn: false,
@@ -23,6 +23,7 @@ function fixture(options: { recurrence?: boolean; attachments?: boolean; extensi
     createdDateTime: "original-created", lastModifiedDateTime: "original-updated", "@odata.etag": 'W/"source-version"',
     recurrence: options.recurrence ? { pattern: { type: "daily" } } : null,
     hasAttachments: options.attachments ?? false,
+    extensions: options.omittedExtensions ? undefined : options.invalidExtensions ? {} : options.extensions ? [{ id: "custom-extension" }] : [],
   };
   let copied: Record<string, unknown>;
   let sourceReads = 0;
@@ -37,9 +38,8 @@ function fixture(options: { recurrence?: boolean; attachments?: boolean; extensi
     if (path === "/me/todo/lists/source") return { id: "source", displayName: "Source", wellknownListName: options.flagged ? "flaggedEmails" : "none" };
     if (path === "/me/todo/lists/destination") return { id: "destination", displayName: "Destination" };
     if (path.endsWith("/tasks/old")) { sourceReads++; return options.edited && sourceReads > 1 ? { ...source, title: "Changed concurrently" } : source; }
-    if (path.endsWith("/tasks/new")) return options.mismatch ? { ...copied, title: "Wrong title" } : copied;
+    if (path.endsWith("/tasks/new")) return { ...copied, extensions: options.omittedExtensions ? undefined : [], ...(options.mismatch ? { title: "Wrong title" } : {}) };
     if (path.endsWith("/attachments")) return { value: [] };
-    if (path.endsWith("/extensions")) return { value: options.extensions ? [{ id: "custom-extension" }] : [] };
     if (path.endsWith("/old/checklistItems")) return { value: [{ id: "check", displayName: "Step", isChecked: true }], ...(options.paged ? { "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/todo/lists/source/tasks/old/checklistItems?$skiptoken=second" } : {}) };
     if (path.includes("$skiptoken=second")) return { value: [{ id: "check2", displayName: "Step two", isChecked: false }] };
     if (path.endsWith("/new/checklistItems")) return { value: copiedChecklist.map((item) => ({ ...(item as object), id: "new-check" })) };
@@ -51,6 +51,21 @@ function fixture(options: { recurrence?: boolean; attachments?: boolean; extensi
 }
 
 describe("copy/verify/delete task moves", () => {
+  it("handles Graph's omitted expansion without requesting the unsupported extensions collection", async () => {
+    const { graph, request } = fixture({ omittedExtensions: true });
+    expect(await moveTask(graph, input, async () => {})).toMatchObject({ moved: true });
+    const reads = request.mock.calls.filter(([method, path]) => method === "GET" && /\/tasks\/(old|new)$/.test(path));
+    expect(reads).toHaveLength(3);
+    for (const [, , opts] of reads) expect(opts).toMatchObject({ query: { "$expand": "extensions" } });
+    expect(request.mock.calls.some(([, path]) => path.endsWith("/extensions"))).toBe(false);
+  });
+
+  it("rejects a malformed extension expansion before writing", async () => {
+    const { graph, request } = fixture({ invalidExtensions: true });
+    await expect(moveTask(graph, input, async () => {})).rejects.toMatchObject({ code: "graph_error" });
+    expect(request.mock.calls.every(([method]) => method === "GET")).toBe(true);
+  });
+
   it("preserves rich body, completed date, null dates, categories and all related pages before deleting", async () => {
     const { graph, request } = fixture({ paged: true });
     const checkpoint = vi.fn(async () => {});

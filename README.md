@@ -53,7 +53,7 @@ Credentials are encrypted; the create journal contains task results in plaintext
 
 CLI commands: `serve` (default), `login`, `logout`, `whoami`, `--version`, `--help`.
 
-`move_task` uses copy/verify/delete because the current Graph To Do API has no native move action. It preserves supported fields, rich notes, checklist items and linked resources. Task/checklist/link IDs and creation timestamps change. Recurrence, attachments, custom extensions and Flagged Emails lists are rejected before writing. Source edits or failed verification leave the source intact; partial copies remain available for inspection. See [move limits and recovery](docs/HARDENING.md#moves-and-deletion).
+`move_task` uses copy/verify/delete because the current Graph To Do API has no native move action. It preserves supported fields, rich notes, checklist items and linked resources. Task/checklist/link IDs and creation timestamps change. Recurrence, attachments, returned custom extensions and Flagged Emails lists are rejected before writing. Graph can omit custom extensions, so unknown extension data is not preserved; use the native app for tasks carrying such data. Source edits or failed verification leave the source intact; partial copies remain available for inspection. See [move limits and recovery](docs/HARDENING.md#moves-and-deletion).
 
 To expose task moves/deletes, run without `--no-destructive` and use client tool filtering to hide `delete_task_list` and `delete_checklist_item` if only task operations are wanted. Read-only mode still hides all writes. Existing `Tasks.ReadWrite` consent is sufficient.
 
