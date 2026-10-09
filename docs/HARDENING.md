@@ -47,6 +47,8 @@ The old plaintext `token-cache.json` is not imported or overwritten. Sign in aga
 
 OS encryption protects data at rest; other processes running as the same Windows user can still access it. Native credential stores must be available on Linux/macOS. Encryption failures stop authentication rather than writing plaintext.
 
+On Debian/Ubuntu, install the runtime library with `sudo apt-get install libsecret-1-0` before starting the MCP. An unlocked Secret Service session is also required for sign-in. CI installs the library for module loading; Linux tests do not exercise a desktop credential store.
+
 ## Creates and retries
 
 `create_task`, `create_task_list`, and `add_checklist_item` accept optional `operationId`. Reuse a stable ID on retries; use a new ID for a separate intended item. Reusing it for different arguments returns `conflict`. Successful calls with an explicit ID replay for 24 hours. Without an ID, identical arguments are deduplicated for 60 seconds.
